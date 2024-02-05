@@ -5,12 +5,13 @@ import seaborn as sns
 import numpy as np
 import re
 import os
-from typing import List
+from typing import List, Dict
+from config import save_interm_to
 
 
 class ETL:
     """
-    Class for performing the Extract, Transform, and Load (ETL) process on a given dataset.
+    **Class for performing the Extract, Transform, and Load (ETL) process on a given dataset.**
 
     This class encapsulates the functionality to read a dataset from a CSV file, transform it based on various options,
     and save the transformed data to a new CSV file.
@@ -19,7 +20,7 @@ class ETL:
     def __init__(self, data_path: str) -> None:
 
         """
-        Initializes the ETL class with the provided data path.
+        **Initializes the ETL class with the provided data path.**
 
         :param data_path: The path to the CSV file containing the dataset.
         """
@@ -35,7 +36,7 @@ class ETL:
     def transform_data(self, option: str) -> None:
 
         """
-        Transforms the dataset based on the specified option.
+        **Transforms the dataset based on the specified option.**
 
         The method applies a series of transformations to the dataset, tailored to the specific needs
         identified by the provided option.
@@ -43,27 +44,29 @@ class ETL:
         :param option: The transformation option ('shop', 'train', 'item', 'test', 'category').
         :return: None
         """
+        if option.lower() not in self.option:
+            raise ValueError("Invalid option. Please choose one of: {}".format(self.option))
 
-        if option.lower() == 'train' and option.lower() in self.option:
+        if option.lower() == 'train':
             self.dqc.train_fix(drop_extreme=True)
             self.dqc.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
 
-        if option.lower() == 'test' and option.lower() in self.option:
+        if option.lower() == 'test':
             self.dqc.test_fix()
 
-        if option.lower() == 'item' and option.lower() in self.option:
+        if option.lower() == 'item':
             self.dqc.item_fix()
 
-        if option.lower() == 'shop' and option.lower() in self.option:
+        if option.lower() == 'shop':
             self.dqc.shop_fix()
 
-        if option.lower() == 'category' and option.lower() in self.option:
+        if option.lower() == 'category':
             self.dqc.item_category_fix()
 
     def get_data(self) -> pd.DataFrame:
 
         """
-        Retrieves the transformed DataFrame.
+        **Retrieves the transformed DataFrame.**
 
         This method returns the DataFrame that has been transformed based on the selected options.
 
@@ -76,7 +79,7 @@ class ETL:
     def load_data(self, file_name: str) -> None:
 
         """
-        Saves the transformed DataFrame to a CSV file.
+        **Saves the transformed DataFrame to a CSV file.**
 
         The method stores the transformed DataFrame into a new CSV file at the specified location.
 
@@ -84,7 +87,7 @@ class ETL:
         :return: None
         """
 
-        self.df.to_csv('/home/avocad00/InnowiseTrainee/FutureSales/data/intermediate/' + file_name + '.csv')
+        self.df.to_csv(save_interm_to + file_name + '.csv', index=False, date_format='%d.%m.%Y')
         print("File {0} was successfully saved".format(file_name))
 
 
@@ -97,7 +100,7 @@ class DQC:
     def __init__(self, df: pd.DataFrame) -> None:
 
         """
-        Initializes the DQC class with the provided DataFrame.
+        **Initializes the DQC class with the provided DataFrame.**
 
         :param df: The DataFrame to perform quality control operations on.
         """
@@ -108,7 +111,7 @@ class DQC:
     def get_data(self) -> pd.DataFrame:
 
         """
-        Retrieves the DataFrame.
+        **Retrieves the DataFrame.**
 
         :return: The DataFrame.
         """
@@ -116,10 +119,10 @@ class DQC:
         return self.df
 
     # Statistic
-    def statistic(self) -> None:
+    def statistics(self) -> None:
 
         """
-        Displays basic statistics and information about the DataFrame.
+        **Displays basic statistics and information about the DataFrame**.
 
         This method provides information about the DataFrame, including its structure, example data,
         number of unique values, and number of duplicated rows.
@@ -143,7 +146,7 @@ class DQC:
     def describe_matrix(self, column_list: List[str]) -> None:
 
         """
-        Displays descriptive statistics for specified columns.
+        **Displays descriptive statistics for specified columns.**
 
         :param column_list: List of column names.
         """
@@ -154,14 +157,14 @@ class DQC:
     def item_fix(self) -> None:
 
         """
-        Fixes issues related to item data.
+        **Fixes issues related to item data.**
 
         This method cleans item names by removing special characters, brackets, and extra spaces,
         and converts them to lowercase.
         """
 
         # fix item name
-        def clean_name(string: str) -> str:
+        def _clean_name(string: str) -> str:
             """
             Cleans the item name.
 
@@ -176,19 +179,19 @@ class DQC:
             string = string.lower()
             return string
 
-        self.df["cleaned_name"] = self.df["item_name"].apply(clean_name)
+        self.df["cleaned_name"] = self.df["item_name"].apply(_clean_name)
 
     # Shops fix
     def shop_fix(self) -> None:
 
         """
-        Fixes issues related to shop data.
+        **Fixes issues related to shop data.**
 
         This method corrects shop IDs and adds a new column 'city' based on the shop name.
         """
 
         # shop id fix
-        shops_id_fix: dict = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df.drop(index=shops_id_fix.keys(), inplace=True)
 
         # add new column 'city'
@@ -199,7 +202,7 @@ class DQC:
     def train_fix(self, drop_extreme: bool = False) -> None:
 
         """
-        Fixes issues related to training data.
+        **Fixes issues related to training data.**
 
         This method drops duplicates, fixes datetime format, corrects shop IDs, and optionally drops extreme values.
 
@@ -212,11 +215,15 @@ class DQC:
         # datetime fix
         self.df['date'] = pd.to_datetime(self.df['date'], format='%d.%m.%Y')
 
+        # add revenue column
+        self.df['revenue'] = self.df['item_price'] * self.df['item_cnt_day']
+
         # shop id fix
-        shops_id_fix: dict = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df = self.df.replace({'shop_id': shops_id_fix})
+
+        # drop extreme or negative values
         if drop_extreme:
-            # drop extreme or negative values
             self.df = self.df.loc[(self.df['item_price'] < 50000) & (self.df['item_price'] > 0)]
             self.df = self.df.loc[(self.df['item_cnt_day'] < 700) & (self.df['item_cnt_day'] > 0)]
 
@@ -224,20 +231,20 @@ class DQC:
     def test_fix(self) -> None:
 
         """
-        Fixes issues related to test data.
+        **Fixes issues related to test data.**
 
         This method corrects shop IDs in the test data.
         """
 
         # shop id fix
-        shops_id_fix: dict = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df = self.df.replace({'shop_id': shops_id_fix})
 
     # item category fix
     def item_category_fix(self) -> None:
 
         """
-        Fixes issues related to item category data.
+        **Fixes issues related to item category data.**
 
         This method adds a new column 'category' based on the item category name.
         """
@@ -249,12 +256,12 @@ class DQC:
     def boxplots(self, columns: List[str]) -> None:
 
         """
-        Displays box plots for specified columns.
+        **Displays box plots for specified columns.**
 
         :param columns: List of column names.
         """
 
-        fig = plt.figure(figsize=(10, 5))
+        _ = plt.figure(figsize=(10, 5))
         for n, i in enumerate(columns):
             plt.subplot(1, len(columns), n + 1)
             plt.xlabel(i)
@@ -265,24 +272,24 @@ class DQC:
     def histplots(self, columns: List[str]) -> None:
 
         """
-        Displays histograms for specified columns.
+        **Displays histograms for specified columns.**
 
         :param columns: List of column names.
         """
 
-        fig = plt.figure(figsize=(10, 5))
+        _ = plt.figure(figsize=(10, 5))
         for n, i in enumerate(columns):
             plt.subplot(1, len(columns), n + 1)
             plt.xlabel(i)
-            sns.histplot(data=self.df, x=i)
+            sns.histplot(data=self.df, x=i, kde=True)
         plt.tight_layout()
         plt.show()
 
     # Outliers
-    def z_score(self, column: str, info: bool = False, change: bool = False) -> None:
+    def z_score(self, column: str, info: bool = True, change: bool = False) -> None:
 
         """
-        Detects outliers using z-score method.
+        **Detects outliers using z-score method.**
 
         :param column: The column name to detect outliers for.
         :param info: Whether to display information about detected outliers.
@@ -302,11 +309,11 @@ class DQC:
             self.df = self.df[(self.df['z_score'] > -3) & (self.df['z_score'] < 3)]
             self.df.drop('z_score', axis=1, inplace=True)
 
-    def outlier_detect_IQR(self, columns: List[str], threshold: float = 3, info: bool = False,
+    def outlier_detect_IQR(self, columns: List[str], threshold: float = 3, info: bool = True,
                            change: bool = False) -> None:
 
         """
-        Detects outliers using the IQR (InterQuartile Range) method.
+        **Detects outliers using the IQR (InterQuartile Range) method.**
 
         :param columns: List of column names to detect outliers for.
         :param threshold: Threshold value for detecting outliers.
@@ -335,10 +342,10 @@ class DQC:
         if change:
             self.df = self.df[~self.df.index.isin(outlier_indices)]
 
-    def isolation_forest(self, columns: List[str], info: bool = False, change: bool = False) -> None:
+    def isolation_forest(self, columns: List[str], info: bool = True, change: bool = False) -> None:
 
         """
-        Detects outliers using the Isolation Forest algorithm.
+        **Detects outliers using the Isolation Forest algorithm.**
 
         :param columns: List of column names to detect outliers for.
         :param info: Whether to display information about detected outliers.
