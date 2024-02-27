@@ -2,24 +2,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from typing import List
 from statsmodels.tsa.seasonal import seasonal_decompose
 import statsmodels.tsa.api as smt
-from src.analysis.statistics_utils import adfuller_stationarity, kpss_stationarity
+from src.visualization.statistics_utils import adfuller_stationarity, kpss_stationarity
 
 
-def barplots(data: pd.DataFrame, group_column: List[str], agg_column: str, x: str, y: str,
-             agg_func: List[str] | None = None) -> None:
+def barplots(data: pd.DataFrame, group_column: list[str], agg_column: str, x: str, y: str,
+             agg_func: list[str] | None = None) -> None:
     """
     **Creates bar plots based on grouping and aggregation of columns.**
 
     This method creates bar plots based on the specified group column and aggregation column.
     Optionally, multiple aggregation functions can be applied to the aggregation column.
 
-    :param data: The data used for grouping and analysis
+    :param data: The data used for grouping and visualization
     :param group_column: The column used for grouping.
     :param agg_column: The column used for aggregation.
-    :param agg_func: List of aggregation functions to apply. Default is ['sum'].
+    :param agg_func: list of aggregation functions to apply. Default is ['sum'].
                      Possible values include 'sum', 'mean', 'median', 'min', 'max', etc.
     :param x: The column to be used as the x-axis in the bar plot.
     :param y: The column to be used as the y-axis in the bar plot.
@@ -47,18 +46,18 @@ def barplots(data: pd.DataFrame, group_column: List[str], agg_column: str, x: st
     plt.tight_layout()
 
 
-def lineplots(data: pd.DataFrame, group_column: List[str], agg_column: str, x: str, y: str,
-              agg_func: List[str] | None = None) -> None:
+def lineplots(data: pd.DataFrame, group_column: list[str], agg_column: str, x: str, y: str,
+              agg_func: list[str] | None = None) -> None:
     """
     **Creates line plots based on grouping and aggregation of columns.**
 
     This method creates line plots based on the specified group column and aggregation column.
     Optionally, multiple aggregation functions can be applied to the aggregation column.
 
-    :param data: The data used for grouping and analysis
+    :param data: The data used for grouping and visualization
     :param group_column: The column used for grouping.
     :param agg_column: The column used for aggregation.
-    :param agg_func: List of aggregation functions to apply. Default is ['sum'].
+    :param agg_func: list of aggregation functions to apply. Default is ['sum'].
                      Possible values include 'sum', 'mean', 'median', 'min', 'max', etc.
     :param x: The column to be used as the x-axis in the line plot.
     :param y: The column to be used as the y-axis in the line plot.
@@ -130,7 +129,7 @@ def series_decompose(series: pd.Series, period: int = 30) -> None:
 
     This function decomposes a time series into its trend, seasonal, and residual components using the
     seasonal decomposition method. It plots the original series along with its trend, seasonal, and
-    residual components for analysis.
+    residual components for visualization.
 
     :param series: The time series data to decompose.
     :param period: The period of seasonality in the time series. Default is 30.

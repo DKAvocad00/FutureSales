@@ -12,5 +12,7 @@ sales_fix_path = '../data/intermediate/sales_fix.csv'
 shops_fix_path = '../data/intermediate/shops_fix.csv'
 test_fix_path = '../data/intermediate/test_fix.csv'
 
-# path to save data
+# path to save intermediate data
 save_interm_to = '../data/intermediate/'
+# path to save final data
+save_final_to = '../data/final/'
