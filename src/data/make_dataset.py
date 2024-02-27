@@ -5,8 +5,7 @@ import seaborn as sns
 import numpy as np
 import re
 import os
-from typing import List, Dict
-from config import save_interm_to
+from path_utils import save_interm_to
 
 
 class ETL:
@@ -26,8 +25,7 @@ class ETL:
         """
 
         self.df: pd.DataFrame = pd.read_csv(data_path)
-        self.dqc: DQC = DQC(self.df)
-        self.option: List[str] = ['shop', 'train', 'item', 'test', 'category']
+        self.option: list[str] = ['shop', 'train', 'item', 'test', 'category']
         print("{0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
                                                                        self.df.shape[1],
                                                                        os.path.basename(data_path)
@@ -48,110 +46,20 @@ class ETL:
             raise ValueError("Invalid option. Please choose one of: {}".format(self.option))
 
         if option.lower() == 'train':
-            self.dqc.train_fix(drop_extreme=True)
-            self.dqc.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
+            self.train_fix(drop_extreme=True)
+            self.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
 
         if option.lower() == 'test':
-            self.dqc.test_fix()
+            self.test_fix()
 
         if option.lower() == 'item':
-            self.dqc.item_fix()
+            self.item_fix()
 
         if option.lower() == 'shop':
-            self.dqc.shop_fix()
+            self.shop_fix()
 
         if option.lower() == 'category':
-            self.dqc.item_category_fix()
-
-    def get_data(self) -> pd.DataFrame:
-
-        """
-        **Retrieves the transformed DataFrame.**
-
-        This method returns the DataFrame that has been transformed based on the selected options.
-
-        :return: Transformed DataFrame.
-        """
-
-        self.df = self.dqc.get_data()
-        return self.df
-
-    def load_data(self, file_name: str) -> None:
-
-        """
-        **Saves the transformed DataFrame to a CSV file.**
-
-        The method stores the transformed DataFrame into a new CSV file at the specified location.
-
-        :param file_name: The name of the CSV file to save.
-        :return: None
-        """
-
-        self.df.to_csv(save_interm_to + file_name + '.csv', index=False, date_format='%d.%m.%Y')
-        print("File {0} was successfully saved".format(file_name))
-
-
-class DQC:
-    """
-    Data Quality Control (DQC) class for performing various data cleaning and quality assurance operations
-    on a given DataFrame.
-    """
-
-    def __init__(self, df: pd.DataFrame) -> None:
-
-        """
-        **Initializes the DQC class with the provided DataFrame.**
-
-        :param df: The DataFrame to perform quality control operations on.
-        """
-
-        self.df: pd.DataFrame = df
-
-    # Basic functions
-    def get_data(self) -> pd.DataFrame:
-
-        """
-        **Retrieves the DataFrame.**
-
-        :return: The DataFrame.
-        """
-
-        return self.df
-
-    # Statistic
-    def statistics(self) -> None:
-
-        """
-        **Displays basic statistics and information about the DataFrame**.
-
-        This method provides information about the DataFrame, including its structure, example data,
-        number of unique values, and number of duplicated rows.
-        """
-
-        # Print information about data
-        print("Information about data:\n")
-        print(f"{self.df.info()}\n\n{'=' * 50}\n")
-
-        # Print some examples of data
-        print("Some examples of data:\n")
-        print(f"{self.df.head(10)}\n\n{'=' * 50}\n")
-
-        # Print number of unique data
-        print("Number of unique data:\n")
-        print(f"{self.df.nunique()}\n\n{'=' * 50}\n")
-
-        # Print number of duplicated data
-        print(f"Number of dublicated data: {self.df.duplicated().sum()}")
-
-    def describe_matrix(self, column_list: List[str]) -> None:
-
-        """
-        **Displays descriptive statistics for specified columns.**
-
-        :param column_list: List of column names.
-        """
-
-        print(self.df[column_list].describe().T)
+            self.item_category_fix()
 
     # Items fix
     def item_fix(self) -> None:
@@ -191,7 +99,7 @@ class DQC:
         """
 
         # shop id fix
-        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df.drop(index=shops_id_fix.keys(), inplace=True)
 
         # add new column 'city'
@@ -219,7 +127,7 @@ class DQC:
         self.df['revenue'] = self.df['item_price'] * self.df['item_cnt_day']
 
         # shop id fix
-        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df = self.df.replace({'shop_id': shops_id_fix})
 
         # drop extreme or negative values
@@ -237,7 +145,7 @@ class DQC:
         """
 
         # shop id fix
-        shops_id_fix: Dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
+        shops_id_fix: dict[int] = {0: 57, 1: 58, 10: 11, 40: 39}
         self.df = self.df.replace({'shop_id': shops_id_fix})
 
     # item category fix
@@ -251,39 +159,6 @@ class DQC:
 
         # add new column global category
         self.df['category'] = self.df['item_category_name'].apply(lambda x: x.split()[0])
-
-    # Graphics
-    def boxplots(self, columns: List[str]) -> None:
-
-        """
-        **Displays box plots for specified columns.**
-
-        :param columns: List of column names.
-        """
-
-        _ = plt.figure(figsize=(10, 5))
-        for n, i in enumerate(columns):
-            plt.subplot(1, len(columns), n + 1)
-            plt.xlabel(i)
-            sns.boxplot(data=self.df, x=i)
-        plt.tight_layout()
-        plt.show()
-
-    def histplots(self, columns: List[str]) -> None:
-
-        """
-        **Displays histograms for specified columns.**
-
-        :param columns: List of column names.
-        """
-
-        _ = plt.figure(figsize=(10, 5))
-        for n, i in enumerate(columns):
-            plt.subplot(1, len(columns), n + 1)
-            plt.xlabel(i)
-            sns.histplot(data=self.df, x=i, kde=True)
-        plt.tight_layout()
-        plt.show()
 
     # Outliers
     def z_score(self, column: str, info: bool = True, change: bool = False) -> None:
@@ -309,7 +184,7 @@ class DQC:
             self.df = self.df[(self.df['z_score'] > -3) & (self.df['z_score'] < 3)]
             self.df.drop('z_score', axis=1, inplace=True)
 
-    def outlier_detect_IQR(self, columns: List[str], threshold: float = 3, info: bool = True,
+    def outlier_detect_IQR(self, columns: list[str], threshold: float = 3, info: bool = True,
                            change: bool = False) -> None:
 
         """
@@ -342,7 +217,7 @@ class DQC:
         if change:
             self.df = self.df[~self.df.index.isin(outlier_indices)]
 
-    def isolation_forest(self, columns: List[str], info: bool = True, change: bool = False) -> None:
+    def isolation_forest(self, columns: list[str], info: bool = True, change: bool = False) -> None:
 
         """
         **Detects outliers using the Isolation Forest algorithm.**
@@ -364,3 +239,125 @@ class DQC:
         if change:
             outliers = [i for i in range(0, len(labels)) if labels[i] == -1]
             self.df = self.df.drop(self.df.iloc[outliers].index, axis=0).copy(deep=True)
+
+    def get_data(self) -> pd.DataFrame:
+
+        """
+        **Retrieves the  DataFrame.**
+
+        This method returns the DataFrame.
+
+        :return: DataFrame.
+        """
+
+        return self.df
+
+    def load_data(self, file_name: str) -> None:
+
+        """
+        **Saves the transformed DataFrame to a CSV file.**
+
+        The method stores the transformed DataFrame into a new CSV file at the specified location.
+
+        :param file_name: The name of the CSV file to save.
+        :return: None
+        """
+
+        self.df.to_csv(save_interm_to + file_name + '.csv', index=False, date_format='%d.%m.%Y')
+        print("File {0} was successfully saved".format(file_name))
+
+
+class DQC:
+    """
+    Data Quality Check (DQC) class for performing  quality assurance operations on a given DataFrame.
+    """
+
+    def __init__(self, df: pd.DataFrame) -> None:
+
+        """
+        **Initializes the DQC class with the provided DataFrame.**
+
+        :param df: The DataFrame to perform quality control operations on.
+        """
+
+        self.df: pd.DataFrame = df
+
+    # Statistic
+    def statistics(self) -> None:
+
+        """
+        **Displays basic statistics and information about the DataFrame**.
+
+        This method provides information about the DataFrame, including its structure, example data,
+        number of unique values, and number of duplicated rows.
+        """
+
+        # Print information about data
+        print("Information about data:\n")
+        print(f"{self.df.info()}\n\n{'=' * 50}\n")
+
+        # Print some examples of data
+        print("Some examples of data:\n")
+        print(f"{self.df.head(10)}\n\n{'=' * 50}\n")
+
+        # Print number of unique data
+        print("Number of unique data:\n")
+        print(f"{self.df.nunique()}\n\n{'=' * 50}\n")
+
+        # Print number of duplicated data
+        print(f"Number of dublicated data: {self.df.duplicated().sum()}")
+
+    def describe_matrix(self, column_list: list[str]) -> None:
+
+        """
+        **Displays descriptive statistics for specified columns.**
+
+        :param column_list: List of column names.
+        """
+
+        print(self.df[column_list].describe().T)
+
+    # Graphics
+    def boxplots(self, columns: dict[str]) -> None:
+
+        """
+        **Displays box plots for specified columns.**
+
+        :param columns: List of column names.
+        """
+
+        _ = plt.figure(figsize=(10, 5))
+        for n, i in enumerate(columns):
+            plt.subplot(1, len(columns), n + 1)
+            plt.xlabel(i)
+            sns.boxplot(data=self.df, x=i)
+        plt.tight_layout()
+        plt.show()
+
+    def histplots(self, columns: dict[str]) -> None:
+
+        """
+        **Displays histograms for specified columns.**
+
+        :param columns: List of column names.
+        """
+
+        _ = plt.figure(figsize=(10, 5))
+        for n, i in enumerate(columns):
+            plt.subplot(1, len(columns), n + 1)
+            plt.xlabel(i)
+            sns.histplot(data=self.df, x=i, kde=True)
+        plt.tight_layout()
+        plt.show()
+
+    def get_data(self) -> pd.DataFrame:
+
+        """
+        **Retrieves the  DataFrame.**
+
+        This method returns the DataFrame.
+
+        :return: DataFrame.
+        """
+
+        return self.df

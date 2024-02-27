@@ -1,7 +1,7 @@
 __pycache__/
 *.py[cod]
 
-venv
+venv/
 
 .idea
 .idea/**/workspace.xml
