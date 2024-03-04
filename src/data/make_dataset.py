@@ -17,7 +17,6 @@ class ETL:
     """
 
     def __init__(self, data_path: str) -> None:
-
         """
         **Initializes the ETL class with the provided data path.**
 
@@ -28,11 +27,11 @@ class ETL:
         self.option: list[str] = ['shop', 'train', 'item', 'test', 'category']
         print("{0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
                                                                        self.df.shape[1],
-                                                                       os.path.basename(data_path)
+                                                                       os.path.basename(
+                                                                           data_path)
                                                                        ))
 
     def transform_data(self, option: str) -> None:
-
         """
         **Transforms the dataset based on the specified option.**
 
@@ -43,11 +42,13 @@ class ETL:
         :return: None
         """
         if option.lower() not in self.option:
-            raise ValueError("Invalid option. Please choose one of: {}".format(self.option))
+            raise ValueError(
+                "Invalid option. Please choose one of: {}".format(self.option))
 
         if option.lower() == 'train':
             self.train_fix(drop_extreme=True)
-            self.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
+            self.isolation_forest(
+                ['item_price', 'item_cnt_day'], info=False, change=True)
 
         if option.lower() == 'test':
             self.test_fix()
@@ -63,7 +64,6 @@ class ETL:
 
     # Items fix
     def item_fix(self) -> None:
-
         """
         **Fixes issues related to item data.**
 
@@ -91,7 +91,6 @@ class ETL:
 
     # Shops fix
     def shop_fix(self) -> None:
-
         """
         **Fixes issues related to shop data.**
 
@@ -103,12 +102,13 @@ class ETL:
         self.df.drop(index=shops_id_fix.keys(), inplace=True)
 
         # add new column 'city'
-        self.df.loc[self.df.shop_name == 'Сергиев Посад ТЦ "7Я"', "shop_name"] = 'СергиевПосад ТЦ "7Я"'
-        self.df['city'] = self.df['shop_name'].str.split(' ').map(lambda x: x[0])
+        self.df.loc[self.df.shop_name == 'Сергиев Посад ТЦ "7Я"',
+        "shop_name"] = 'СергиевПосад ТЦ "7Я"'
+        self.df['city'] = self.df['shop_name'].str.split(
+            ' ').map(lambda x: x[0])
 
     # train fix
     def train_fix(self, drop_extreme: bool = False) -> None:
-
         """
         **Fixes issues related to training data.**
 
@@ -132,12 +132,13 @@ class ETL:
 
         # drop extreme or negative values
         if drop_extreme:
-            self.df = self.df.loc[(self.df['item_price'] < 50000) & (self.df['item_price'] > 0)]
-            self.df = self.df.loc[(self.df['item_cnt_day'] < 700) & (self.df['item_cnt_day'] > 0)]
+            self.df = self.df.loc[(self.df['item_price'] < 50000) & (
+                    self.df['item_price'] > 0)]
+            self.df = self.df.loc[(self.df['item_cnt_day'] < 700) & (
+                    self.df['item_cnt_day'] > 0)]
 
     # test fix
     def test_fix(self) -> None:
-
         """
         **Fixes issues related to test data.**
 
@@ -150,7 +151,6 @@ class ETL:
 
     # item category fix
     def item_category_fix(self) -> None:
-
         """
         **Fixes issues related to item category data.**
 
@@ -158,11 +158,11 @@ class ETL:
         """
 
         # add new column global category
-        self.df['category'] = self.df['item_category_name'].apply(lambda x: x.split()[0])
+        self.df['category'] = self.df['item_category_name'].apply(
+            lambda x: x.split()[0])
 
     # Outliers
     def z_score(self, column: str, info: bool = True, change: bool = False) -> None:
-
         """
         **Detects outliers using z-score method.**
 
@@ -171,22 +171,26 @@ class ETL:
         :param change: Whether to remove outliers from the DataFrame.
         """
 
-        self.df['z_score'] = (self.df[column] - self.df[column].mean()) / self.df[column].std()
-        outliers = self.df[(self.df['z_score'] < -3) | (self.df['z_score'] > 3)]
+        self.df['z_score'] = (
+                                     self.df[column] - self.df[column].mean()) / self.df[column].std()
+        outliers = self.df[(self.df['z_score'] < -3) |
+                           (self.df['z_score'] > 3)]
 
         if info:
             print(f"{'=' * 50}\n\nZ_score outliers detection:\n")
-            print("Number of outliers in {0}: {1}".format(column, outliers.shape[0]))
-            print("Outlier share in {0}: {1}%".format(column, round((outliers.shape[0] / self.df.shape[0] * 100), 3)))
+            print("Number of outliers in {0}: {1}".format(
+                column, outliers.shape[0]))
+            print("Outlier share in {0}: {1}%".format(column, round(
+                (outliers.shape[0] / self.df.shape[0] * 100), 3)))
             print(f"\n{'=' * 50}")
 
         if change:
-            self.df = self.df[(self.df['z_score'] > -3) & (self.df['z_score'] < 3)]
+            self.df = self.df[(self.df['z_score'] > -3) &
+                              (self.df['z_score'] < 3)]
             self.df.drop('z_score', axis=1, inplace=True)
 
     def outlier_detect_IQR(self, columns: list[str], threshold: float = 3, info: bool = True,
                            change: bool = False) -> None:
-
         """
         **Detects outliers using the IQR (InterQuartile Range) method.**
 
@@ -202,14 +206,16 @@ class ETL:
             IQR = self.df[col].quantile(0.75) - self.df[col].quantile(0.25)
             lower_fence = self.df[col].quantile(0.25) - (IQR * threshold)
             upper_fence = self.df[col].quantile(0.75) + (IQR * threshold)
-            tmp = pd.concat([self.df[col] > upper_fence, self.df[col] < lower_fence], axis=1)
+            tmp = pd.concat([self.df[col] > upper_fence,
+                             self.df[col] < lower_fence], axis=1)
             outlier_index = tmp.any(axis=1)
             outlier_indices.extend(outlier_index[outlier_index].index)
             outliers.extend(self.df.loc[outlier_index, col])
 
             if info:
                 print(f"{'=' * 50}\n\nIQR outliers detection:\n")
-                print("Number of outliers in {0}: {1}".format(col, outlier_index.sum()))
+                print("Number of outliers in {0}: {1}".format(
+                    col, outlier_index.sum()))
                 print("Outlier share in {0}: {1}%".format(col,
                                                           round((outlier_index.sum() / len(outlier_index) * 100), 3)))
                 print(f"\n{'=' * 50}\n")
@@ -218,7 +224,6 @@ class ETL:
             self.df = self.df[~self.df.index.isin(outlier_indices)]
 
     def isolation_forest(self, columns: list[str], info: bool = True, change: bool = False) -> None:
-
         """
         **Detects outliers using the Isolation Forest algorithm.**
 
@@ -232,16 +237,18 @@ class ETL:
 
         if info:
             print(f"{'=' * 50}\n\nIsolation forest outliers detection:\n")
-            print("Number of outliers: {0}".format(np.count_nonzero(labels == -1)))
-            print("Outlier share: {0}%".format(round((np.count_nonzero(labels == -1) / len(labels) * 100), 3)))
+            print("Number of outliers: {0}".format(
+                np.count_nonzero(labels == -1)))
+            print("Outlier share: {0}%".format(
+                round((np.count_nonzero(labels == -1) / len(labels) * 100), 3)))
             print(f"\n{'=' * 50}")
 
         if change:
             outliers = [i for i in range(0, len(labels)) if labels[i] == -1]
-            self.df = self.df.drop(self.df.iloc[outliers].index, axis=0).copy(deep=True)
+            self.df = self.df.drop(
+                self.df.iloc[outliers].index, axis=0).copy(deep=True)
 
     def get_data(self) -> pd.DataFrame:
-
         """
         **Retrieves the  DataFrame.**
 
@@ -253,7 +260,6 @@ class ETL:
         return self.df
 
     def load_data(self, file_name: str) -> None:
-
         """
         **Saves the transformed DataFrame to a CSV file.**
 
@@ -263,7 +269,8 @@ class ETL:
         :return: None
         """
 
-        self.df.to_csv(save_interm_to + file_name + '.csv', index=False, date_format='%d.%m.%Y')
+        self.df.to_csv(save_interm_to + file_name + '.csv',
+                       index=False, date_format='%d.%m.%Y')
         print("File {0} was successfully saved".format(file_name))
 
 
@@ -273,7 +280,6 @@ class DQC:
     """
 
     def __init__(self, df: pd.DataFrame) -> None:
-
         """
         **Initializes the DQC class with the provided DataFrame.**
 
@@ -284,7 +290,6 @@ class DQC:
 
     # Statistic
     def statistics(self) -> None:
-
         """
         **Displays basic statistics and information about the DataFrame**.
 
@@ -308,7 +313,6 @@ class DQC:
         print(f"Number of dublicated data: {self.df.duplicated().sum()}")
 
     def describe_matrix(self, column_list: list[str]) -> None:
-
         """
         **Displays descriptive statistics for specified columns.**
 
@@ -319,7 +323,6 @@ class DQC:
 
     # Graphics
     def boxplots(self, columns: dict[str]) -> None:
-
         """
         **Displays box plots for specified columns.**
 
@@ -335,7 +338,6 @@ class DQC:
         plt.show()
 
     def histplots(self, columns: dict[str]) -> None:
-
         """
         **Displays histograms for specified columns.**
 
@@ -351,7 +353,6 @@ class DQC:
         plt.show()
 
     def get_data(self) -> pd.DataFrame:
-
         """
         **Retrieves the  DataFrame.**
 
