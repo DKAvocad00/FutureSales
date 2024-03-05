@@ -25,11 +25,11 @@ class ETL:
 
         self.df: pd.DataFrame = pd.read_csv(data_path)
         self.option: list[str] = ['shop', 'train', 'item', 'test', 'category']
-        print("{0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
-                                                                       self.df.shape[1],
-                                                                       os.path.basename(
-                                                                           data_path)
-                                                                       ))
+        print("INFO: {0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
+                                                                             self.df.shape[1],
+                                                                             os.path.basename(
+                                                                                 data_path)
+                                                                             ))
 
     def transform_data(self, option: str) -> None:
         """
@@ -271,7 +271,7 @@ class ETL:
 
         self.df.to_csv(save_interm_to + file_name + '.csv',
                        index=False, date_format='%d.%m.%Y')
-        print("File {0} was successfully saved".format(file_name))
+        print("INFO: File {0} was successfully saved".format(file_name))
 
 
 class DQC:
