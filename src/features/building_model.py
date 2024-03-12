@@ -5,8 +5,7 @@ from path_utils import save_final_to
 import catboost as cb
 from sklearn.model_selection import TimeSeriesSplit
 from statsmodels.tsa.stattools import adfuller, kpss
-
-from sklearn.preprocessing import MinMaxScaler
+import os
 
 
 class ValidationSchema:
@@ -14,11 +13,11 @@ class ValidationSchema:
 
     """
 
-    def __init__(self, final_data_path: str) -> None:
+    def __init__(self, df: pd.DataFrame) -> None:
         """
 
         """
-        self.final_data = pd.read_csv(final_data_path)
+        self.final_data: pd.DataFrame = df
 
     def train_test_spliter(self, val_size: float = 0.04) -> dict:
         """
@@ -60,7 +59,9 @@ class FeatureExtraction:
         """
 
         """
-        self.df = None
+        self.df: pd.DataFrame = None
+        self.mean_features: list = None
+        self.lag_features_to_clip: list = None
 
     def create_final_data(self, train: pd.DataFrame, test: pd.DataFrame | None = None,
                           make_big: bool = False) -> None:
@@ -119,30 +120,99 @@ class FeatureExtraction:
         # Fill NaN values with 0 for item_cnt_month and item_revenue_month columns
         self.df['item_cnt_month'] = self.df['item_cnt_month'].fillna(0)
 
-    def add_city(self, shop_path: str) -> None:
+    def add_city_features(self, shop_path: str) -> None:
         """
 
         """
         shop_data = pd.read_csv(shop_path)
-        self.df = self.df.merge(shop_data[['city', 'shop_id']], how="inner", on=['shop_id'])
+        shop_data["shop_category"] = shop_data['shop_name'].str.split(" ").map(lambda x: x[1])
 
-    def add_mean_price(self, sales_path: str, scaler: bool = False) -> None:
+        self.df = self.df.merge(shop_data[['city', 'shop_category', 'shop_id']], how="left", on=['shop_id'])
+
+    def add_item_categories_features(self, item_categories_path: str, threshold: int = 5) -> None:
+        """
+
+        """
+
+        def _make_etc(x: str) -> str:
+            if len(item_categories_data[item_categories_data['category'] == x]) >= threshold:
+                return x
+            else:
+                return 'etc'
+
+        item_categories_data = pd.read_csv(item_categories_path)
+
+        item_categories_data['category'] = item_categories_data['category'].apply(_make_etc)
+
+        self.df = self.df.merge(item_categories_data[['category', 'item_category_id']], how="left",
+                                on=['item_category_id'])
+
+    def add_mean_features(self, idx_features: list, with_cv_schema: bool = False,
+                          validation_indexes: list | None = None) -> None:
+        """
+
+        """
+        assert (idx_features[0] == 'date_block_num') and len(idx_features) in [2, 3]
+
+        if len(idx_features) == 2:
+            feature_name = idx_features[1] + '_mean_sales'
+        else:
+            feature_name = idx_features[1] + '_' + idx_features[2] + '_mean_sales'
+
+        group = self.df.groupby(idx_features).agg({'item_cnt_month': 'mean'})
+        group = group.reset_index()
+        group = group.rename(columns={'item_cnt_month': feature_name})
+
+        self.df = self.df.merge(group, on=idx_features, how='left')
+
+        self.mean_features.append(feature_name)
+
+    def add_lag_features(self, idx_features: list, lag_feature: list, nlags: int = 3, clip: bool = False,
+                         with_cv_schema: bool = False, validation_indexes: list | None = None) -> None:
+        """
+
+        """
+        df_temp = self.df[idx_features + [lag_feature]].copy()
+
+        for i in range(1, nlags + 1):
+            lag_feature_name = lag_feature + '_lag' + str(i)
+
+            df_temp.columns = idx_features + [lag_feature_name]
+
+            df_temp['date_block_num'] += 1
+            self.df = self.df.merge(df_temp.drop_duplicates(), on=idx_features, how='left')
+            self.df[lag_feature_name] = self.df[lag_feature_name].fillna(0)
+
+            if clip:
+                self.lag_features_to_clip.append(lag_feature_name)
+
+    def add_mean_price(self, sales_path: str, with_cv_schema: bool = False,
+                       validation_indexes: list | None = None) -> None:
         """
 
         """
         sales_data = pd.read_csv(sales_path)
-        group = sales_data.groupby(['date_block_num', 'shop_id', 'item_id'], as_index=False).agg(
-            item_mean_price=pd.NamedAgg(column="item_price", aggfunc="mean")
-        )
+        if with_cv_schema:
+            for row in validation_indexes:
+                indexes_to_calculating = np.append(row['train'], row['val'])
 
-        self.df = self.df.merge(group, how="left",
-                                on=['date_block_num', 'shop_id', 'item_id'])
+                group = sales_data[sales_data['date_block_num'].isin(indexes_to_calculating)].groupby(
+                    ['date_block_num', 'shop_id', 'item_id'], as_index=False).agg(
+                    item_mean_price=pd.NamedAgg(column="item_price", aggfunc="mean"))
 
-        self.df['item_mean_price'] = self.df['item_mean_price'].fillna(0)
+                self.df = self.df.merge(group, how="left", on=['date_block_num', 'shop_id', 'item_id'])
 
-        if scaler:
-            minmax_scaler = MinMaxScaler()
-            self.df['item_mean_price'] = minmax_scaler.fit_transform(self.df['item_mean_price'])
+                # self.df['item_mean_price'] = self.df['item_mean_price'].fillna(0)
+                self.df = self.df.rename(
+                    columns={'item_mean_price': 'item_mean_price_' + str(indexes_to_calculating.max())})
+
+        else:
+            group = sales_data.groupby(['date_block_num', 'shop_id', 'item_id'], as_index=False).agg(
+                item_mean_price=pd.NamedAgg(column="item_price", aggfunc="mean"))
+
+            self.df = self.df.merge(group, how="left", on=['date_block_num', 'shop_id', 'item_id'])
+
+            self.df['item_mean_price'] = self.df['item_mean_price'].fillna(0)
 
     @staticmethod
     def _ts_stationarity_check(df: pd.DataFrame, column: str, significance_level: float = 0.05) -> str:
@@ -216,13 +286,11 @@ class FeatureExtraction:
 
     def load_data(self, file_name: str) -> None:
         """
-        **Saves the transformed DataFrame to a CSV file.**
 
-        The method stores the transformed DataFrame into a new CSV file at the specified location.
-
-        :param file_name: The name of the CSV file to save.
-        :return: None
         """
+
+        if not os.path.exists(save_final_to):
+            os.makedirs(save_final_to)
 
         self.df.to_csv(save_final_to + file_name + '.csv',
                        index=False, date_format='%d.%m.%Y')

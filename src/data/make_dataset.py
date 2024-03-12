@@ -260,13 +260,11 @@ class ETL:
 
     def load_data(self, file_name: str) -> None:
         """
-        **Saves the transformed DataFrame to a CSV file.**
 
-        The method stores the transformed DataFrame into a new CSV file at the specified location.
-
-        :param file_name: The name of the CSV file to save.
-        :return: None
         """
+
+        if not os.path.exists(save_interm_to):
+            os.makedirs(save_interm_to)
 
         self.df.to_csv(save_interm_to + file_name + '.csv',
                        index=False, date_format='%d.%m.%Y')

@@ -1,24 +1,38 @@
-import math
 import pandas as pd
+import os
 
 
-def asMinutes(s: float) -> str:
+def downcast(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
     """
-    **Converts time in seconds to a string representation in minutes and seconds.**
 
-    This function takes a time duration in seconds and converts it into a human-readable string
-    representation in minutes and seconds format.
-
-    :param s: The time duration in seconds.
-    :return: A string representing the time duration in minutes and seconds format (e.g., '5m 30s').
     """
-    m = math.floor(s / 60)
-    s -= m * 60
-    return '{}m {}s'.format(round(m), round(s))
+    start_mem = df.memory_usage().sum() / 1024 ** 2
+    for col in df.columns:
+        dtype_name = df[col].dtype.name
+        if dtype_name == 'object':
+            pass
+        elif dtype_name == 'bool':
+            df[col] = df[col].astype('int8')
+        elif dtype_name.startswith('int') or (df[col].round() == df[col]).all():
+            df[col] = pd.to_numeric(df[col], downcast='integer')
+        else:
+            df[col] = pd.to_numeric(df[col], downcast='float')
+    end_mem = df.memory_usage().sum() / 1024 ** 2
+    if verbose:
+        print('{:.1f}% compressed'.format(100 * (start_mem - end_mem) / start_mem))
+
+    return df
 
 
 def create_kaggle_data(predictions: list[float], file_name: str, save_path: str) -> None:
+    """
+
+    """
     kaggle = pd.DataFrame({'item_cnt_month': predictions})
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     kaggle.to_csv(save_path + file_name + '.csv',
                   index=True, index_label="ID")
 
