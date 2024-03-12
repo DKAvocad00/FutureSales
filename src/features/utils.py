@@ -1,4 +1,5 @@
 import math
+import pandas as pd
 
 
 def asMinutes(s: float) -> str:
@@ -14,3 +15,11 @@ def asMinutes(s: float) -> str:
     m = math.floor(s / 60)
     s -= m * 60
     return '{}m {}s'.format(round(m), round(s))
+
+
+def create_kaggle_data(predictions: list[float], file_name: str, save_path: str) -> None:
+    kaggle = pd.DataFrame({'item_cnt_month': predictions})
+    kaggle.to_csv(save_path + file_name + '.csv',
+                  index=True, index_label="ID")
+
+    print("INFO: File {0} was successfully saved".format(file_name))

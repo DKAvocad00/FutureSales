@@ -47,8 +47,7 @@ class ETL:
 
         if option.lower() == 'train':
             self.train_fix(drop_extreme=True)
-            self.isolation_forest(
-                ['item_price', 'item_cnt_day'], info=False, change=True)
+            self.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
 
         if option.lower() == 'test':
             self.test_fix()
