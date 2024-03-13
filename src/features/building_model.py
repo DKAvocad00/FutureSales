@@ -13,11 +13,14 @@ class ValidationSchema:
 
     """
 
-    def __init__(self, df: pd.DataFrame) -> None:
+    def __init__(self, data: str | pd.DataFrame) -> None:
         """
 
         """
-        self.final_data: pd.DataFrame = df
+        if isinstance(data, str):
+            self.final_data: pd.DataFrame = pd.read_csv(data)
+        else:
+            self.final_data: pd.DataFrame = data
 
     def train_test_spliter(self, val_size: float = 0.04) -> dict:
         """
@@ -50,7 +53,7 @@ class ValidationSchema:
         return {'validation_indexes': validation_data, 'test_indexes': [test_data]}
 
 
-class FeatureExtraction:
+class FeatureModeling:
     """
 
     """
@@ -120,6 +123,9 @@ class FeatureExtraction:
         # Fill NaN values with 0 for item_cnt_month and item_revenue_month columns
         self.df['item_cnt_month'] = self.df['item_cnt_month'].fillna(0)
 
+        # Add month feature
+        self.df['month'] = self.df['date_block_num'] % 12
+
     def add_city_features(self, shop_path: str) -> None:
         """
 
@@ -128,6 +134,22 @@ class FeatureExtraction:
         shop_data["shop_category"] = shop_data['shop_name'].str.split(" ").map(lambda x: x[1])
 
         self.df = self.df.merge(shop_data[['city', 'shop_category', 'shop_id']], how="left", on=['shop_id'])
+
+    def add_item_features(self, item_path: str, sales_path: str) -> None:
+        """
+
+        """
+        item_data = pd.read_csv(item_path)
+        sales_data = pd.read_csv(sales_path)
+
+        item_data['first_sale_date'] = sales_data.groupby('item_id').agg({'date_block_num': 'min'})['date_block_num']
+        item_data['first_sale_date'] = item_data['first_sale_date'].fillna(34)
+
+        self.df = self.df.merge(item_data[['item_id', 'item_category_id', 'first_sale_date']], how="left",
+                                on=['item_id'])
+
+        self.df['duration_after_first_sale'] = self.df['date_block_num'] - self.df['first_sale_date']
+        self.df.drop('first_sale_date', axis=1, inplace=True)
 
     def add_item_categories_features(self, item_categories_path: str, threshold: int = 5) -> None:
         """
