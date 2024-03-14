@@ -2,55 +2,8 @@ import pandas as pd
 import itertools
 import numpy as np
 from path_utils import save_final_to
-import catboost as cb
-from sklearn.model_selection import TimeSeriesSplit
 from statsmodels.tsa.stattools import adfuller, kpss
 import os
-
-
-class ValidationSchema:
-    """
-
-    """
-
-    def __init__(self, data: str | pd.DataFrame) -> None:
-        """
-
-        """
-        if isinstance(data, str):
-            self.final_data: pd.DataFrame = pd.read_csv(data)
-        else:
-            self.final_data: pd.DataFrame = data
-
-    def train_test_spliter(self, val_size: float = 0.04) -> dict:
-        """
-
-        """
-        test_months = (self.final_data['date_block_num'].unique()).max()
-        train_months = test_months - 1
-
-        train = self.final_data[self.final_data['date_block_num'] <= round((1 - val_size) * train_months)]
-
-        val = self.final_data[(self.final_data['date_block_num'] > train_months - round(val_size * train_months)) & (
-                self.final_data['date_block_num'] < test_months)]
-
-        test = self.final_data[self.final_data['date_block_num'].isin([test_months])]
-
-        return {'train': train, 'val': val, 'test': test}
-
-    def cv_spliter(self, max_train_size: int = 12) -> dict:
-        """
-
-        """
-        test_data = (self.final_data['date_block_num'].unique()).max()
-        to_train = self.final_data[self.final_data['date_block_num'] <= (test_data - 1)]
-
-        tscv = TimeSeriesSplit(n_splits=-2 * max_train_size + 46, max_train_size=max_train_size, test_size=1, gap=0)
-
-        validation_data = [{'train': train_indexes, 'val': val_indexes} for train_indexes, val_indexes in
-                           tscv.split(to_train['date_block_num'].unique())]
-
-        return {'validation_indexes': validation_data, 'test_indexes': [test_data]}
 
 
 class FeatureModeling:
@@ -63,8 +16,8 @@ class FeatureModeling:
 
         """
         self.df: pd.DataFrame = None
-        self.mean_features: list = None
-        self.lag_features_to_clip: list = None
+        self.mean_features: list = []
+        self.lag_features_to_clip: list = []
 
     def create_final_data(self, train: pd.DataFrame, test: pd.DataFrame | None = None,
                           make_big: bool = False) -> None:
@@ -208,6 +161,18 @@ class FeatureModeling:
             if clip:
                 self.lag_features_to_clip.append(lag_feature_name)
 
+    def add_lag_mean_features(self, idx_features: list, nlags: int = 3, drop_mean_features: bool = False,
+                              clip: bool = False) -> None:
+        """
+
+        """
+        for item_mean_feature in self.mean_features:
+            self.add_lag_features(idx_features=idx_features, lag_feature=item_mean_feature, nlags=nlags, clip=clip)
+
+        if drop_mean_features:
+            self.df = self.df.drop(self.mean_features, axis=1)
+            self.mean_features = []
+
     def add_mean_price(self, sales_path: str, with_cv_schema: bool = False,
                        validation_indexes: list | None = None) -> None:
         """
@@ -327,46 +292,3 @@ class FeatureModeling:
         :return: DataFrame.
         """
         return self.df
-
-
-def train_model(train: pd.DataFrame, val: pd.DataFrame, test: pd.DataFrame, in_features: list[str], target: list[str],
-                cat_features: list[str] | None = None) -> list[float]:
-    """
-
-    """
-    train_data = cb.Pool(train[in_features],
-                         train[target],
-                         cat_features=cat_features)
-    val_data = cb.Pool(val[in_features],
-                       val[target],
-                       cat_features=cat_features)
-
-    model = cb.CatBoostRegressor(cat_features=cat_features, task_type="GPU", random_seed=42)
-    model.fit(train_data, eval_set=val_data, use_best_model=True, verbose=True, early_stopping_rounds=70)
-    return model.predict(test[in_features])
-
-
-def train_cv_model(data: pd.DataFrame, validation_indexes: list, test_indexes: list, in_features: list[str],
-                   target: list[str], cat_features: list[str] | None = None) -> None:
-    """
-
-    """
-    test = data[data['date_block_num'].isin(test_indexes)]
-
-    model = cb.CatBoostRegressor(task_type="GPU", random_seed=42)
-
-    for idx, row in validation_indexes:
-        print("Iteration {} of {}".format(idx, len(validation_indexes)))
-        train_df = data[data['date_block_num'].isin(row['train'])]
-        val_df = data[data['date_block_num'].isin(row['val'])]
-
-        train_data = cb.Pool(train_df[in_features],
-                             train_df[target],
-                             cat_features=cat_features)
-        val_data = cb.Pool(val_df[in_features],
-                           val_df[target],
-                           cat_features=cat_features)
-
-        model.fit(train_data, eval_set=val_data, use_best_model=True, verbose=True, early_stopping_rounds=70)
-
-    return model.predict(test[in_features])
