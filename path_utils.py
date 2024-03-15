@@ -20,3 +20,6 @@ save_interm_to = '../data/intermediate/'
 
 # path to save final data
 save_final_to = '../data/final/'
+
+# path to save model
+save_model_to = '../models/'

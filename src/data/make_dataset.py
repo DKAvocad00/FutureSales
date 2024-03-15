@@ -260,7 +260,12 @@ class ETL:
 
     def load_data(self, file_name: str) -> None:
         """
+        **Save the DataFrame to a CSV file.**
 
+        This method saves the DataFrame to a CSV file with the specified file name.
+
+        :param file_name: The name of the CSV file to save.
+        :return: None
         """
 
         if not os.path.exists(save_interm_to):
