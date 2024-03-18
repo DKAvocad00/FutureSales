@@ -1,4 +1,13 @@
-FROM ubuntu:latest
-LABEL authors="avocad00"
+FROM python:3.10
 
-ENTRYPOINT ["top", "-b"]
+WORKDIR /app
+
+COPY requirements.txt /app
+
+RUN pip install -r requirements.txt
+
+COPY . /app
+
+RUN chmod +x entrypoint.sh
+
+CMD ["./entrypoint.sh"]
