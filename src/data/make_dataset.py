@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 import re
 import os
-from path_utils import save_interm_to
+from src.path_utils import save_interm_to
 
 
 class ETL:
@@ -24,12 +24,12 @@ class ETL:
         """
 
         self.df: pd.DataFrame = pd.read_csv(data_path)
-        self.option: list[str] = ['shop', 'train', 'item', 'test', 'category']
-        print("INFO: {0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
-                                                                             self.df.shape[1],
-                                                                             os.path.basename(
-                                                                                 data_path)
-                                                                             ))
+        self.option: list[str] = ['shops', 'sales', 'items', 'test', 'item_categories']
+        print("[INFO]: {0} rows and {1} columns has been read from {2}".format(self.df.shape[0],
+                                                                               self.df.shape[1],
+                                                                               os.path.basename(
+                                                                                   data_path)
+                                                                               ))
 
     def transform_data(self, option: str) -> None:
         """
@@ -45,20 +45,20 @@ class ETL:
             raise ValueError(
                 "Invalid option. Please choose one of: {}".format(self.option))
 
-        if option.lower() == 'train':
+        if option.lower() == 'sales':
             self.train_fix(drop_extreme=True)
             self.isolation_forest(['item_price', 'item_cnt_day'], info=False, change=True)
 
         if option.lower() == 'test':
             self.test_fix()
 
-        if option.lower() == 'item':
+        if option.lower() == 'items':
             self.item_fix()
 
-        if option.lower() == 'shop':
+        if option.lower() == 'shops':
             self.shop_fix()
 
-        if option.lower() == 'category':
+        if option.lower() == 'item_categories':
             self.item_category_fix()
 
     # Items fix
@@ -170,10 +170,8 @@ class ETL:
         :param change: Whether to remove outliers from the DataFrame.
         """
 
-        self.df['z_score'] = (
-                                     self.df[column] - self.df[column].mean()) / self.df[column].std()
-        outliers = self.df[(self.df['z_score'] < -3) |
-                           (self.df['z_score'] > 3)]
+        self.df['z_score'] = (self.df[column] - self.df[column].mean()) / self.df[column].std()
+        outliers = self.df[(self.df['z_score'] < -3) | (self.df['z_score'] > 3)]
 
         if info:
             print(f"{'=' * 50}\n\nZ_score outliers detection:\n")
@@ -273,7 +271,7 @@ class ETL:
 
         self.df.to_csv(save_interm_to + file_name + '.csv',
                        index=False, date_format='%d.%m.%Y')
-        print("INFO: File {0} was successfully saved".format(file_name))
+        print("[INFO]: File {0} was successfully saved".format(file_name))
 
 
 class DQC:

@@ -23,3 +23,5 @@ venv/
 
 /notebooks/catboost_info/
 /data/final/
+/src/modeling/catboost_info/
+/catboost_info/

@@ -2,50 +2,37 @@ from typing import Callable, Any
 import pandas as pd
 import itertools
 import numpy as np
-from path_utils import save_final_to
-from statsmodels.tsa.stattools import adfuller, kpss
+from src.path_utils import save_final_to
 import os
-
-from src.modeling.utils import downcast
+from src.modeling.utils import downcast, write_to_json
 
 
 class FeatureModeling:
     """
-
+    Class for feature engineering and modeling.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, sales_path: str, shop_path: str, item_path: str, item_categories_path: str, test_path) -> None:
         """
+        Initialize FeatureModeling object with file paths for sales, shop, item, item categories, and test data.
 
-        """
-        self.sales_path: str | None = None
-        self.shop_path: str | None = None
-        self.item_path: str | None = None
-        self.item_categories_path: str | None = None
-
-        self.df: pd.DataFrame | None = None
-        self.mean_features: list = []
-        self.lag_features_to_clip: list = []
-
-    def set_data_paths(self, sales_path: str, shop_path: str, item_path: str, item_categories_path: str) -> None:
-        """
-        Set the paths for data files used in feature engineering.
-
-        This method allows setting the file paths for the sales data, shop data, item data, and item categories data.
-
-        :param sales_path: The file path for the sales data.
-        :param shop_path: The file path for the shop data.
-        :param item_path: The file path for the item data.
-        :param item_categories_path: The file path for the item categories data.
-        :return: None
+        :param sales_path: Path to the sales data file.
+        :param shop_path: Path to the shop data file.
+        :param item_path: Path to the item data file.
+        :param item_categories_path: Path to the item categories data file.
+        :param test_path: Path to the test data file.
         """
         self.sales_path: str = sales_path
         self.shop_path: str = shop_path
         self.item_path: str = item_path
         self.item_categories_path: str = item_categories_path
+        self.test_path: str = test_path
 
-    def create_final_data(self, train: pd.DataFrame, test: pd.DataFrame | None = None,
-                          make_big: bool = False) -> None:
+        self.df: pd.DataFrame | None = None
+        self.mean_features: list = []
+        self.features_dict: dict = {"in_features": [], "target": [], "cat_features": [], "lag_features": {}}
+
+    def create_final_data(self, make_big: bool = False) -> None:
 
         """
         **Creates the final DataFrame for training based on the provided train and test DataFrames.**
@@ -55,12 +42,14 @@ class FeatureModeling:
         Optionally, it can expand the DataFrame to include all possible combinations of date_block_num,
         shop_id, and item_id if make_big is set to True.
 
-        :param train: The train DataFrame containing historical sales data.
-        :param test: The test DataFrame containing data for prediction. Default is None.
         :param make_big: If True, expands the DataFrame to include all possible combinations of
                          date_block_num, shop_id, and item_id. Default is False.
         :return: The final DataFrame for training.
         """
+
+        # Read DataFrames
+        train = pd.read_csv(self.sales_path)
+        test = pd.read_csv(self.test_path)
 
         # Aggregate train DataFrame based on date_block_num, shop_id, and item_id
         self.df = train.groupby(["date_block_num", "shop_id", "item_id"], as_index=False).agg(
@@ -99,6 +88,10 @@ class FeatureModeling:
         # Downcast data
         self.df = downcast(self.df, verbose=False)
 
+        self.features_dict['in_features'].extend(self.df.columns.difference(['item_cnt_month']))
+        self.features_dict['target'].extend(['item_cnt_month'])
+        self.features_dict['cat_features'].extend(self.df.columns.difference(['item_cnt_month']))
+
     def add_city_features(self) -> None:
         """
         **Add city-related features to the DataFrame.**
@@ -116,6 +109,9 @@ class FeatureModeling:
 
         # Merge shop data with the DataFrame on shop_id
         self.df = self.df.merge(shop_data[['city', 'shop_category', 'shop_id']], how="left", on=['shop_id'])
+
+        self.features_dict['in_features'].extend(['city', 'shop_category'])
+        self.features_dict['cat_features'].extend(['city', 'shop_category'])
 
     def add_item_features(self) -> None:
         """
@@ -140,6 +136,9 @@ class FeatureModeling:
         # Compute the duration after the first sale for each item
         self.df['duration_after_first_sale'] = self.df['date_block_num'] - self.df['first_sale_date']
         self.df.drop('first_sale_date', axis=1, inplace=True)
+
+        self.features_dict['in_features'].extend(['item_category_id', 'duration_after_first_sale'])
+        self.features_dict['cat_features'].extend(['item_category_id', 'duration_after_first_sale'])
 
     def add_item_categories_features(self, threshold: int = 5) -> None:
         """
@@ -169,100 +168,146 @@ class FeatureModeling:
         self.df = self.df.merge(item_categories_data[['category', 'item_category_id']], how="left",
                                 on=['item_category_id'])
 
-    def add_mean_features(self, idx_features: list, with_cv_schema: bool = False,
-                          validation_indexes: list | None = None) -> None:
+        self.features_dict['in_features'].extend(['category'])
+        self.features_dict['cat_features'].extend(['category'])
+
+    def add_mean_price(self) -> None:
+        """
+        **Add mean price features to the DataFrame.**
+
+        This method calculates the mean item price for each (date_block_num, shop_id, item_id) group
+        from the sales data and merges it into the DataFrame.
+
+        :return: None
         """
 
+        sales_data = pd.read_csv(self.sales_path)
+
+        # Group the sales data by date_block_num, shop_id, and item_id, and calculate the mean item price
+        group = sales_data.groupby(['date_block_num', 'shop_id', 'item_id'], as_index=False).agg({'item_price': 'mean'})
+        group.rename(columns={'item_price': 'item_mean_price'}, inplace=True)
+
+        # Merge the calculated mean item price with the main DataFrame based on date_block_num, shop_id, and item_id
+        self.df = self.df.merge(group, how="left", on=['date_block_num', 'shop_id', 'item_id'])
+
+        self.df['item_mean_price'] = self.df['item_mean_price'].fillna(0)
+
+        self.df = downcast(self.df, verbose=False)
+
+    def add_mean_features(self, idx_features: list) -> None:
         """
+        **Add mean sales features to the DataFrame based on the specified index features.**
+
+        This method calculates the mean monthly sales for each unique combination of the specified index features
+        and merges it into the DataFrame.
+
+        :param idx_features: List of features used for grouping the data.
+                             Should include 'date_block_num' as the first element and one or two additional features.
+        :return: None
+        """
+
+        # Ensure that the first index feature is 'date_block_num' and the length is valid
         assert (idx_features[0] == 'date_block_num') and len(idx_features) in [2, 3]
 
+        # Determine the feature name based on the number of index features
         if len(idx_features) == 2:
             feature_name = idx_features[1] + '_mean_sales'
         else:
             feature_name = idx_features[1] + '_' + idx_features[2] + '_mean_sales'
 
-        group = self.df.groupby(idx_features).agg({'item_cnt_month': 'mean'})
-        group = group.reset_index()
-        group = group.rename(columns={'item_cnt_month': feature_name})
+        # Group the DataFrame by the specified index features and calculate the mean monthly sales
+        group = self.df.groupby(idx_features, as_index=False).agg({'item_cnt_month': 'mean'})
+        group.rename(columns={'item_cnt_month': feature_name}, inplace=True)
 
+        # Merge the calculated mean sales feature with the main DataFrame based on the index features
         self.df = self.df.merge(group, on=idx_features, how='left')
 
         self.mean_features.append(feature_name)
 
-    def add_lag_features(self, idx_features: list, lag_feature: list, nlags: int = 3, clip: bool = False,
-                         with_cv_schema: bool = False, validation_indexes: list | None = None) -> None:
-        """
+        self.df = downcast(self.df, verbose=False)
 
+    def add_lag_features(self, idx_features: list, lag_feature: str, validation_dict: dict, nlags: int = 3) -> None:
         """
+        **Add lagged features to the DataFrame based on the specified lag feature and index features.**
+
+        This method calculates lagged features for the given lag feature and adds them to the DataFrame.
+        The number of lagged features to create can be specified by the 'nlags' parameter.
+
+        :param idx_features: List of features used for grouping the data.
+        :param lag_feature: The feature for which lagged features will be created.
+        :param validation_dict: Dictionary containing validation indexes.
+        :param nlags: Number of lagged features to create. Default is 3.
+        :return: None
+        """
+        assert idx_features[0] == 'date_block_num'
+
+        # Initialize lag_features dictionary for each fold
+        self.features_dict["lag_features"] = {fold: self.features_dict["lag_features"].get(fold, []) for fold, _ in
+                                              enumerate(validation_dict['validation_indexes'])}
+
         df_temp = self.df[idx_features + [lag_feature]].copy()
 
-        for i in range(1, nlags + 1):
-            lag_feature_name = lag_feature + '_lag' + str(i)
+        for fold, row in enumerate(validation_dict['validation_indexes']):
 
-            df_temp.columns = idx_features + [lag_feature_name]
+            indexes_to_calculating = np.concatenate((row['train'], row['val'], validation_dict['test_indexes']))
 
-            df_temp['date_block_num'] += 1
-            self.df = self.df.merge(df_temp.drop_duplicates(), on=idx_features, how='left')
-            self.df[lag_feature_name] = self.df[lag_feature_name].fillna(0)
+            for i in range(1, nlags + 1):
+                lag_feature_name = lag_feature + '_lag' + str(i) + "_" + str(fold)
 
-            if clip:
-                self.lag_features_to_clip.append(lag_feature_name)
+                df_temp.columns = idx_features + [lag_feature_name]
 
-    def add_lag_mean_features(self, idx_features: list, nlags: int = 3, drop_mean_features: bool = False,
-                              clip: bool = False) -> None:
+                df_temp.loc[df_temp['date_block_num'].isin(indexes_to_calculating), 'date_block_num'] += 1
+
+                self.df = self.df.merge(df_temp.drop_duplicates(), on=idx_features, how='left')
+
+                self.df[lag_feature_name] = self.df[lag_feature_name].fillna(0)
+
+                self.features_dict['lag_features'][fold].append(lag_feature_name)
+
+        del df_temp
+        self.df = downcast(self.df, verbose=False)
+
+    def add_lag_mean_features(self, idx_features: list, validation_dict: dict, nlags: int = 3,
+                              drop_mean_features: bool = False) -> None:
+        """
+        **Add lagged mean features to the DataFrame based on the specified index features.**
+
+        This method calculates lagged mean features for each existing mean feature in the DataFrame and adds them as new
+        features. Optionally, it can drop the original mean features after creating lagged features.
+
+        :param idx_features: List of features used for grouping the data.
+        :param validation_dict: Dictionary containing validation indexes.
+        :param nlags: Number of lagged features to create. Default is 3.
+        :param drop_mean_features: Whether to drop the original mean features after creating lagged features. Default is False.
+        :return: None
         """
 
-        """
         for item_mean_feature in self.mean_features:
-            self.add_lag_features(idx_features=idx_features, lag_feature=item_mean_feature, nlags=nlags, clip=clip)
+            # Add lagged features for the current mean feature
+            self.add_lag_features(idx_features=idx_features, lag_feature=item_mean_feature,
+                                  validation_dict=validation_dict, nlags=nlags)
 
+        # Optionally drop the original mean features after creating lagged features
         if drop_mean_features:
-            self.df = self.df.drop(self.mean_features, axis=1)
+            self.df.drop(self.mean_features, axis=1, inplace=True)
             self.mean_features = []
-
-    def add_mean_price(self, with_cv_schema: bool = False, validation_indexes: list | None = None) -> None:
-        """
-
-        """
-        sales_data = pd.read_csv(self.sales_path)
-        if with_cv_schema:
-            for row in validation_indexes:
-                indexes_to_calculating = np.append(row['train'], row['val'])
-
-                group = sales_data[sales_data['date_block_num'].isin(indexes_to_calculating)].groupby(
-                    ['date_block_num', 'shop_id', 'item_id'], as_index=False).agg(
-                    item_mean_price=pd.NamedAgg(column="item_price", aggfunc="mean"))
-
-                self.df = self.df.merge(group, how="left", on=['date_block_num', 'shop_id', 'item_id'])
-
-                self.df = self.df.rename(
-                    columns={'item_mean_price': 'item_mean_price_' + str(indexes_to_calculating.max())})
-
-        else:
-            group = sales_data.groupby(['date_block_num', 'shop_id', 'item_id'], as_index=False).agg(
-                item_mean_price=pd.NamedAgg(column="item_price", aggfunc="mean"))
-
-            self.df = self.df.merge(group, how="left", on=['date_block_num', 'shop_id', 'item_id'])
-
-            self.df['item_mean_price'] = self.df['item_mean_price'].fillna(0)
 
     def final_process(self):
         """
+        **Perform final processing steps on the DataFrame.**
 
+        This method performs the final processing steps on the DataFrame, including dropping the 'item_mean_price' column
+        and downcasting the DataFrame.
+
+        :return: None
         """
         # Drop item_mean
         self.df = self.df.drop('item_mean_price', axis=1)
 
-        # Add new lag mean column
-        self.df['item_cnt_month_lag_mean'] = self.df[
-            ['item_cnt_month_lag1', 'item_cnt_month_lag2', 'item_cnt_month_lag3']].mean(axis=1)
-
-        # Clip data
-        self.df[self.lag_features_to_clip + ['item_cnt_month', 'item_cnt_month_lag_mean']] = self.df[
-            self.lag_features_to_clip + ['item_cnt_month', 'item_cnt_month_lag_mean']].clip(0, 20)
-
         # Downcast data
         self.df = downcast(self.df, verbose=False)
+
+        write_to_json(key="training_feature", value=self.features_dict)
 
     @staticmethod
     def add_features(feature_functions: list[Callable], **kwargs: Any) -> None:
@@ -278,111 +323,25 @@ class FeatureModeling:
         """
         for func in feature_functions:
             func(**kwargs)
+            print('[INFO]: {} function was successfully processed'.format(func.__name__))
 
-    @staticmethod
-    def _ts_stationarity_check(df: pd.DataFrame, column: str, significance_level: float = 0.05) -> str:
-        """
-        **Check the stationarity of a time series using ADF and KPSS tests.**
-
-        This static method checks the stationarity of a time series column in a
-        DataFrame using the Augmented Dickey-Fuller (ADF) and Kwiatkowski-Phillips-Schmidt-Shin
-        (KPSS) tests. It returns the stationarity status of the time series.
-
-        :param df: The DataFrame containing the time series data.
-        :param column: The name of the column containing the time series data.
-        :param significance_level: The significance level for the tests. Default is 0.05.
-        :return: The stationarity status of the time series.
-        """
-
-        stationarity: str = "not defined"
-
-        try:
-            adf_stats: tuple = adfuller(df[column])
-        except ValueError:
-            print("Invalid input, x is constant")
-            stationarity = "stationary"
-            return stationarity
-
-        try:
-            kpss_stats: tuple = kpss(df[column])
-        except OverflowError:
-            print("OverflowError: cannot convert float infinity to integer.")
-            return stationarity
-
-        significance_level_perc: str = str(int(significance_level * 100)) + "%"
-
-        try:
-            if (kpss_stats[0] < kpss_stats[3][significance_level_perc]) and (
-                    adf_stats[0] < adf_stats[4][significance_level_perc]) and \
-                    (kpss_stats[1] > significance_level) and (adf_stats[1] < significance_level):
-                stationarity = "stationary"
-            elif (kpss_stats[0] > kpss_stats[3][significance_level_perc]) and (
-                    adf_stats[0] > adf_stats[4][significance_level_perc]) and \
-                    (kpss_stats[1] < significance_level) and (adf_stats[1] > significance_level):
-                stationarity = "non-stationary"
-            elif (kpss_stats[0] < kpss_stats[3][significance_level_perc]) and (
-                    adf_stats[0] > adf_stats[4][significance_level_perc]) and \
-                    (kpss_stats[1] > significance_level) and (adf_stats[1] > significance_level):
-                stationarity = "trend stationary"
-            elif (kpss_stats[0] > kpss_stats[3][significance_level_perc]) and (
-                    adf_stats[0] < adf_stats[4][significance_level_perc]) and \
-                    (kpss_stats[1] < significance_level) and (adf_stats[1] < significance_level):
-                stationarity = "difference stationary"
-            else:
-                print("The stationarity of the series cannot be verified.")
-
-        except KeyError:
-            if (kpss_stats[1] > significance_level) and (adf_stats[1] < significance_level):
-                stationarity = "stationary"
-            elif (kpss_stats[1] < significance_level) and (adf_stats[1] > significance_level):
-                stationarity = "non-stationary"
-            elif (kpss_stats[1] > significance_level) and (adf_stats[1] > significance_level):
-                stationarity = "trend stationary"
-            elif (kpss_stats[1] < significance_level) and (adf_stats[1] < significance_level):
-                stationarity = "difference stationary"
-            else:
-                print("The stationarity of the series cannot be verified.")
-
-        except Exception:
-            print("The stationarity of the series cannot be verified with the given parameters.")
-
-        return stationarity
-
-    def ts_nonstatinarity_processing(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
-        """
-        **Process non-stationary time series data by differencing until it becomes stationary.**
-
-        This method processes non-stationary time series data in a DataFrame column by differencing until it becomes
-        stationary. It uses the _ts_stationarity_check method to determine the stationarity of the series.
-
-        :param df: The DataFrame containing the time series data.
-        :param column: The name of the column containing the time series data.
-        :return: The DataFrame with processed stationary time series data.
-        """
-
-        while self._ts_stationarity_check(df, column) != "stationary":
-            diff_column = np.diff(df[column])
-            diff_column = np.append(diff_column, np.mean(diff_column))
-            df[column] = diff_column
-
-        return df
-
-    def load_data(self, file_name: str) -> None:
+    def load_data(self, file_name: str, save_to: str = save_final_to) -> None:
         """
         **Save the DataFrame to a CSV file.**
 
         This method saves the DataFrame to a CSV file with the specified file name.
 
         :param file_name: The name of the CSV file to save.
+        :param save_to: Path to save final data.
         :return: None
         """
 
         if not os.path.exists(save_final_to):
             os.makedirs(save_final_to)
 
-        self.df.to_csv(save_final_to + file_name + '.csv',
+        self.df.to_csv(save_to + file_name + '.csv',
                        index=False, date_format='%d.%m.%Y')
-        print("INFO: File {0} was successfully saved".format(file_name))
+        print("[INFO]: File {0} was successfully saved".format(file_name))
 
     def get_data(self) -> pd.DataFrame:
         """
