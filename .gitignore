@@ -27,3 +27,4 @@ catboost_info/.
 catboost_info
 catboost_info/
 /models/
+/data/final/
