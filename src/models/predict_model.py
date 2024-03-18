@@ -14,22 +14,22 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Script for generating predictions using a trained CatBoost model.")
 
-    parser.add_argument(name_or_flags="--final_data_path",
+    parser.add_argument("--final_data_path",
                         default=final_full_data_path,
                         type=str,
                         help="Path to the file containing the final processed data (default: final_full_data_path).")
 
-    parser.add_argument(name_or_flags="--catboost_model_path",
+    parser.add_argument("--catboost_model_path",
                         default=catboost_model_path,
                         type=str,
                         help="Path to the file containing the trained CatBoost model (default: catboost_model_path).")
 
-    parser.add_argument(name_or_flags="--save_kaggle_path",
+    parser.add_argument("--save_kaggle_path",
                         default=save_final_to,
                         type=str,
                         help=f"Path to save the prediction files in a format "
                              f"suitable for Kaggle submission (default: save_final_to).")
-    parser.add_argument(name_or_flags="--kaggle_file_name",
+    parser.add_argument("--kaggle_file_name",
                         default="kaggle_predictions",
                         type=str,
                         help="Name of the file to save Kaggle predictions (default: 'kaggle_predictions').")

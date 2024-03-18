@@ -21,7 +21,9 @@ venv/
 .idea/**/libraries
 *.iws /out/
 
-/notebooks/catboost_info/
-/data/final/
-/src/modeling/catboost_info/
-/catboost_info/
+
+**/catboost_info/
+catboost_info/.
+catboost_info
+catboost_info/
+/models/

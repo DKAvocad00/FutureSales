@@ -115,8 +115,6 @@ class TrainingModel:
         if save_model:
             self._save_training_model(model=model, model_name=model_name)
 
-        return model.predict(test[in_features])
-
     @validate_validation_type('cv')
     def train_cv_model(self, in_features: list[str], lag_features: dict[list], target: list[str],
                        cat_features: list[str], save_model: bool = False, model_name: str | None = None) -> list[float]:
@@ -172,8 +170,6 @@ class TrainingModel:
 
         # Get the lag features for the last fold
         _, last_value = lag_features.popitem()
-
-        return model.predict(test[in_features + last_value])
 
     @validate_validation_type('full')
     def parameter_search(self, param_space: dict, in_features: list[str], lag_features: dict[list], target: list[str],

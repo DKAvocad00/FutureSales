@@ -19,11 +19,12 @@ class ValidationSchema:
         else:
             self.final_data: pd.DataFrame = data
 
-    def train_test_spliter(self, train_size: int = 32) -> dict:
+    def train_test_spliter(self, train_size: int = 32, write_validation_type: bool = False) -> dict:
         """
         **Split the data into train and test sets using a fixed train size.**
 
         :param train_size: The size of the training set. Default is 32.
+        :param write_validation_type:
         :return: A dictionary containing validation and test indexes, and the validation type.
         """
 
@@ -37,15 +38,17 @@ class ValidationSchema:
                      self.final_data['date_block_num'] > train_size)].unique())}
         ]
 
-        write_to_json(key="training_type", value='full')
+        if write_validation_type:
+            write_to_json(key="training_type", value='full')
 
         return {'validation_indexes': validation_data, 'test_indexes': [test_data], 'validation_type': 'full'}
 
-    def cv_spliter(self, max_train_size: int = 12) -> dict:
+    def cv_spliter(self, max_train_size: int = 12, write_validation_type: bool = False) -> dict:
         """
         **Split the data into train and validation sets using TimeSeriesSplit cross-validation.**
 
         :param max_train_size: Maximum size of the training set for each fold. Default is 12.
+        :param write_validation_type:
         :return: A dictionary containing validation and test indexes, and the validation type.
         """
 
@@ -60,6 +63,7 @@ class ValidationSchema:
         validation_data = [{'train': train_indexes, 'val': val_indexes} for train_indexes, val_indexes in
                            tscv.split(to_train['date_block_num'].unique())]
 
-        write_to_json(key="training_type", value='cv')
+        if write_validation_type:
+            write_to_json(key="training_type", value='cv')
 
         return {'validation_indexes': validation_data, 'test_indexes': [test_data], 'validation_type': 'cv'}

@@ -7,38 +7,48 @@ import catboost as cb
 
 class Explainability:
     """
-
+    Class for generating SHAP (SHapley Additive exPlanations) plots to explain model predictions.
     """
 
-    def __init__(self, model: cb.CatBoostRegressor, df: pd.DataFrame, validation_dict: dict) -> None:
+    def __init__(self, model: cb.CatBoostRegressor, val_data: pd.DataFrame, validation_dict: dict) -> None:
         """
+        **Initialize Explainability object.**
 
+        :param model: Trained CatBoostRegressor model.
+        :param val_data: DataFrame containing validation data.
+        :param validation_dict: Dictionary containing validation data details.
         """
-
         self.model: cb.CatBoostRegressor = model
-        self.df: pd.DataFrame = df
         self.validation_dict: dict = validation_dict
+        self.val_data: pd.DataFrame = val_data
 
-        self.val = self.df[
-            self.df['date_block_num'].isin([row['val'] for row in self.validation_dict['validation_indexes']][0])]
-        self.explainer: shap.TreeExplainer = shap.TreeExplainer(self.model,
-                                                                self.val.drop(columns=['item_cnt_month'], axis=1))
-        self.shap_values: np.array = self.explainer.shap_values(self.val.drop(columns=['item_cnt_month'], axis=1))
+        self.X: pd.DataFrame = self.val_data.drop(columns=['item_cnt_month'], axis=1)
 
-    def shap_visualization(self, dep_feature_name: str, force_sample_idx: int = 0) -> None:
+        self.explainer: shap.TreeExplainer = shap.TreeExplainer(self.model)
+        self.shap_values: np.array = self.explainer.shap_values(self.X)
+
+    def shap_summary(self) -> None:
         """
+        *8Generate summary SHAP plot.**
 
+        This method generates a summary plot of SHAP values.
+
+        :return: None
         """
-
         print("\nSummary plot:\n")
-        shap.summary_plot(self.shap_values[0])
+        shap.summary_plot(self.shap_values, features=self.X, feature_names=self.X.columns, color="auto")
 
-        print("\nForce plot:\n")
-        shap.force_plot(self.explainer.expected_value[0], self.shap_values[0][force_sample_idx, :],
-                        self.val[force_sample_idx, :],
-                        feature_names=self.val.drop(columns=['item_cnt_month'], axis=1).columns.to_list())
+    def shap_dependece(self, dep_features_name: list) -> None:
+        """
+        **Generate SHAP dependence plots.*8
+
+        This method generates SHAP dependence plots for specified features.
+
+        :param dep_features_name: List of feature names for which dependence plots are generated.
+        :return: None
+        """
 
         print("\nDependence plot:\n")
-        shap.dependence_plot(dep_feature_name, self.shap_values[0],
-                             self.val.drop(columns=['item_cnt_month'], axis=1),
-                             feature_names=self.val.columns.to_list())
+        for feature in dep_features_name:
+            shap.dependence_plot(feature, self.shap_values,
+                                 self.X, feature_names=self.X.columns.to_list())
