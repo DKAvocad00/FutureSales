@@ -1,9 +1,12 @@
+**/__pycache__/
+__pycache__/.
+__pycache__
 __pycache__/
 *.py[cod]
 
-venv
+venv/
 
-
+.idea
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/dictionaries
@@ -17,3 +20,10 @@ venv
 .idea/**/gradle.xml
 .idea/**/libraries
 *.iws /out/
+
+
+**/catboost_info/
+catboost_info/.
+catboost_info
+catboost_info/
+/models/

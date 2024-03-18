@@ -1,0 +1,50 @@
+{
+  "training_type": "full",
+  "model_params": {},
+  "training_feature": {
+    "in_features": [
+      "date_block_num",
+      "item_id",
+      "month",
+      "shop_id",
+      "city",
+      "shop_category",
+      "item_category_id",
+      "duration_after_first_sale",
+      "category"
+    ],
+    "target": [
+      "item_cnt_month"
+    ],
+    "cat_features": [
+      "date_block_num",
+      "item_id",
+      "month",
+      "shop_id",
+      "city",
+      "shop_category",
+      "item_category_id",
+      "duration_after_first_sale",
+      "category"
+    ],
+    "lag_features": {
+      "0": [
+        "item_cnt_month_lag1_0",
+        "item_cnt_month_lag2_0",
+        "item_cnt_month_lag3_0",
+        "item_mean_price_lag1_0",
+        "item_mean_price_lag2_0",
+        "item_mean_price_lag3_0",
+        "item_id_mean_sales_lag1_0",
+        "item_id_mean_sales_lag2_0",
+        "item_id_mean_sales_lag3_0",
+        "item_id_city_mean_sales_lag1_0",
+        "item_id_city_mean_sales_lag2_0",
+        "item_id_city_mean_sales_lag3_0",
+        "shop_id_item_category_id_mean_sales_lag1_0",
+        "shop_id_item_category_id_mean_sales_lag2_0",
+        "shop_id_item_category_id_mean_sales_lag3_0"
+      ]
+    }
+  }
+}
