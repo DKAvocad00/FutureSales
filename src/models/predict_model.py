@@ -3,10 +3,11 @@ from sys import path
 import os
 
 path.append('.')
-from src.path_utils import save_final_to, catboost_model_path, final_full_data_path
+from src.path_utils import save_final_to, catboost_model_path, final_full_data_path, save_model_to
 from src.modeling.validation_schema import ValidationSchema
 from src.modeling.training_schema import TrainingModel
 from src.modeling.utils import create_kaggle_data, read_json_file, downcast
+from src.drive_utils import DriveUtils
 import pandas as pd
 import catboost as cb
 
@@ -41,27 +42,38 @@ if __name__ == "__main__":
     KAGGLE_PATH = args.save_kaggle_path
     KAGGLE_FILE_NAME = args.kaggle_file_name
 
+    drive = DriveUtils()
+
     try:
         with os.scandir(save_final_to) as entries:
             pass
     except FileNotFoundError:
-        print("[ERROR]: The directory does not exist. Please run train_model.py before running this script.")
-        raise
+        print("[ERROR]: The directory does not exist. Trying to load data directory from Googl Drive...")
+
+        drive.data_download_from_google_drive()
 
     try:
         with open(DATA_PATH, 'r'):
             pass
     except FileNotFoundError:
         print(f"[ERROR]: The file does not exist."
-              f" Please choose another directory and try again or run train_model.py before running this script.")
+              f" Please choose another data path and try again or run train_model.py before running this script.")
         raise
+
+    try:
+        with os.scandir(save_model_to) as entries:
+            pass
+    except FileNotFoundError:
+        print(f"[ERROR]: The directory does not exist. Trying to load models directory from Google Drive...")
+
+        drive.models_download_from_google_drive()
 
     try:
         with open(MODEL_PATH, 'r'):
             pass
     except FileNotFoundError:
         print(f"[ERROR]: The model does not exist."
-              f" Please choose another directory and try again or run train_model.py before running this script.")
+              f" Please choose another model path and try again or run train_model.py before running this script.")
         raise
 
     print("[INFO]: Reading final data...")

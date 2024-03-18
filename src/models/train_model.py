@@ -30,11 +30,6 @@ if __name__ == "__main__":
                         type=str,
                         help="Name for the final processed data file (default: 'final_full_data').")
 
-    parser.add_argument("--save_model",
-                        default=True,
-                        type=argparse.BooleanOptionalAction,
-                        help="Flag indicating whether to save the trained model (default: True).")
-
     parser.add_argument("--final_model_name",
                         default="catboost_full",
                         type=str,
@@ -45,7 +40,6 @@ if __name__ == "__main__":
     MAKE_BIG = args.make_data_big
     VALIDATION_TYPE = args.validation_type
     FILE_NAME = args.final_data_name
-    SAVE_MODEL = args.save_model
     FINAL_MODEL_NAME = args.final_model_name
 
     if VALIDATION_TYPE.lower() not in ["full", "cv"]:
@@ -127,7 +121,7 @@ if __name__ == "__main__":
                           lag_features=model_params["training_feature"]["lag_features"],
                           target=model_params["training_feature"]["target"],
                           cat_features=model_params["training_feature"]["cat_features"],
-                          save_model=SAVE_MODEL,
+                          save_model=True,
                           model_name=FINAL_MODEL_NAME)
 
     else:
@@ -135,7 +129,7 @@ if __name__ == "__main__":
                              lag_features=model_params["training_feature"]["lag_features"],
                              target=model_params["training_feature"]["target"],
                              cat_features=model_params["training_feature"]["cat_features"],
-                             save_model=SAVE_MODEL,
+                             save_model=True,
                              model_name=FINAL_MODEL_NAME)
 
     print("[INFO]: Training of the model was successfully completed")

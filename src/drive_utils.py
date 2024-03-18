@@ -43,6 +43,7 @@ def validate_directory(expected_directory: str) -> Callable:
                     print(f"[INFO]: The {expected_directory} directory already exists.")
             except Exception as e:
                 print(f"[ERROR]: An error occurred while creating the directory: {e}")
+                raise
 
             return func(self, *args, **kwargs)
 
